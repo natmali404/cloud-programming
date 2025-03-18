@@ -1,18 +1,13 @@
 require("dotenv").config();
 
 const amqp = require("amqplib");
-const Type1Event = require("../domain/type1event"); //only this changes in each consumer
+const Type4Event = require("../domain/type4event");
 const logger = require("../../../utils/logger");
 
-function simulateWork(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
-class Consumer1 {
+//a consumer that is also a publisher
+class Consumer4 {
   constructor(name) {
-    this.name = name ?? "Consumer1";
+    this.name = name ?? "Consumer4";
     this.connection = null;
     this.channel = null;
   }
@@ -27,7 +22,7 @@ class Consumer1 {
       await this.init();
     }
 
-    const event = new Type1Event(); //only this changes in each consumer; needed for reflection
+    const event = new Type4Event(); //only this changes in each consumer; needed for reflection
     const channelName = event.constructor.name; //reflection
 
     await this.channel.assertQueue(channelName, {
@@ -42,7 +37,6 @@ class Consumer1 {
     this.channel.consume(channelName, async (msg) => {
       if (msg !== null) {
         const message = msg.content.toString();
-        await simulateWork(1000);
         this.channel.ack(msg);
         logger.info(
           `${this.name} consumed message from ${channelName}: ${message}`
@@ -52,8 +46,8 @@ class Consumer1 {
   }
 }
 
-const consumerName = process.argv[2] ?? "Consumer1";
-const consumer = new Consumer1(consumerName);
+const consumerName = process.argv[2] ?? "Consumer4";
+const consumer = new Consumer4(consumerName);
 
 consumer.consume().catch((error) => {
   logger.error(`Error in ${consumerName}: ${error.message}`);

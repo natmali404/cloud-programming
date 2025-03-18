@@ -2,12 +2,12 @@ require("dotenv").config();
 const { format } = require("date-fns");
 
 const amqp = require("amqplib");
-const Type1Event = require("../domain/type1event"); //only this changes in each publisher
+const Type3Event = require("../domain/type3event"); //only this changes in each publisher
 const logger = require("../../../utils/logger");
 
-class Publisher1 {
+class Publisher3 {
   constructor(name) {
-    this.name = name ?? "Publisher1";
+    this.name = name ?? "Publisher3";
     this.connection = null;
     this.channel = null;
   }
@@ -38,22 +38,33 @@ class Publisher1 {
       await this.init();
     }
 
-    let counter = 0;
     logger.info(`${this.constructor.name} begins its work`);
 
-    setInterval(() => {
-      const event = new Type1Event(
-        `RECURRING EVENT FROM ${this.name} - ${counter}`
-      ); //only this changes in each publisher
+    const getRandomIntervalInSeconds = (min, max) =>
+      (Math.random() * (max - min) + min).toFixed(1);
 
-      this.sendMessage(event);
-      counter += 1;
-    }, 5000);
+    //create a loop
+    //while it runs, create a task with random interval.
+    //send the message, after its sent, mark it as done (promise resolve...?)
+    const runTaskInLoop = async () => {
+      while (true) {
+        const randomInterval = getRandomIntervalInSeconds(5, 15);
+        await new Promise((resolve) =>
+          setTimeout(resolve, randomInterval * 1000)
+        ); //delay
+        const event = new Type3Event(
+          `RANDOM EVENT FROM ${this.name} - LONG INTERVAL ${randomInterval}`
+        );
+        await this.sendMessage(event);
+      }
+    };
+
+    await runTaskInLoop();
   }
 }
 
-const publisherName = process.argv[2] ?? "Publisher1";
-const publisher = new Publisher1(publisherName);
+const publisherName = process.argv[2] ?? "Publisher3";
+const publisher = new Publisher3(publisherName);
 
 publisher.publish().catch((error) => {
   logger.error(`Error in ${publisherName}: ${error.message}`);

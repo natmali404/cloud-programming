@@ -1,18 +1,15 @@
 require("dotenv").config();
+const { format } = require("date-fns");
 
 const amqp = require("amqplib");
-const Type1Event = require("../domain/type1event"); //only this changes in each consumer
+const Type3Event = require("../domain/type3event"); //only this changes in each consumer
+const Type4Event = require("../domain/type4event");
 const logger = require("../../../utils/logger");
 
-function simulateWork(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
-class Consumer1 {
+//a consumer that is also a publisher
+class Consumer3 {
   constructor(name) {
-    this.name = name ?? "Consumer1";
+    this.name = name ?? "Consumer3";
     this.connection = null;
     this.channel = null;
   }
@@ -22,12 +19,28 @@ class Consumer1 {
     this.channel = await this.connection.createChannel();
   }
 
+  async sendMessage(event) {
+    const channelName = event.constructor.name; //reflection
+    await this.channel.assertQueue(channelName, { durable: false });
+
+    const message = `MSG OF TYPE ${channelName} AT ${format(
+      event.timestamp.toISOString(),
+      "yyyy-MM-dd HH:mm:ss.SS"
+    )} - ${event.data}]`;
+
+    this.channel.sendToQueue(channelName, Buffer.from(message));
+
+    logger.info(
+      `Published message from ${this.name} to ${channelName}: ${message}`
+    );
+  }
+
   async consume() {
     if (!this.connection || !this.channel) {
       await this.init();
     }
 
-    const event = new Type1Event(); //only this changes in each consumer; needed for reflection
+    const event = new Type3Event(); //only this changes in each consumer; needed for reflection
     const channelName = event.constructor.name; //reflection
 
     await this.channel.assertQueue(channelName, {
@@ -42,18 +55,20 @@ class Consumer1 {
     this.channel.consume(channelName, async (msg) => {
       if (msg !== null) {
         const message = msg.content.toString();
-        await simulateWork(1000);
         this.channel.ack(msg);
         logger.info(
           `${this.name} consumed message from ${channelName}: ${message}`
         );
+        //generate type4 right after consuming type3
+        const event = new Type4Event(`SPECIAL EVENT ${this.name} OCCURED`);
+        await this.sendMessage(event);
       }
     });
   }
 }
 
-const consumerName = process.argv[2] ?? "Consumer1";
-const consumer = new Consumer1(consumerName);
+const consumerName = process.argv[2] ?? "Consumer3";
+const consumer = new Consumer3(consumerName);
 
 consumer.consume().catch((error) => {
   logger.error(`Error in ${consumerName}: ${error.message}`);
