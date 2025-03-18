@@ -7,10 +7,19 @@ const logger = require("../../../utils/logger");
 class Publisher1 {
   constructor(name) {
     this.name = name ?? "Publisher1";
+    this.connection = null;
+    this.channel = null;
   }
+
+  async init() {
+    this.connection = await amqp.connect(process.env.RABBITMQ_URL);
+    this.channel = await this.connection.createChannel();
+  }
+
   async publish() {
-    const connection = await amqp.connect(process.env.RABBITMQ_URL);
-    const channel = await connection.createChannel();
+    if (!this.connection || !this.channel) {
+      await this.init();
+    }
     let counter = 0;
     logger.info(`${this.constructor.name} begins its work`);
     setInterval(() => {
@@ -18,18 +27,18 @@ class Publisher1 {
         `RECURRING EVENT FROM ${this.name} - ${counter}`
       ); //only this changes in each publisher
       const channelName = event.constructor.name; //reflection
-      channel.assertQueue(channelName, { durable: false });
+      this.channel.assertQueue(channelName, { durable: false });
       const message = JSON.stringify({
         type: channelName,
         data: event.data,
         timestamp: event.timestamp,
       });
-      channel.sendToQueue(channelName, Buffer.from(message));
+      this.channel.sendToQueue(channelName, Buffer.from(message));
       logger.info(
         `Published message from ${this.name} to ${channelName}: ${message}`
       );
       counter += 1;
-    }, 10000);
+    }, 5000);
   }
 }
 

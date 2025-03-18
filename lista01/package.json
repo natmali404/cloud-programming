@@ -11,6 +11,7 @@
   "description": "",
   "dependencies": {
     "amqplib": "^0.10.5",
+    "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
     "winston": "^3.17.0"
   }
